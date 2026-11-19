@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>One-Line Formatter</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;padding:28px;background:linear-gradient(135deg,#0b1020,#172554 55%,#312e81);font-family:Inter,Segoe UI,Arial,sans-serif;color:#eef2ff}
+.container{max-width:1050px;margin:auto}
+.card{background:rgba(15,23,42,.92);border:1px solid rgba(148,163,184,.2);border-radius:24px;padding:26px;box-shadow:0 24px 70px rgba(0,0,0,.38)}
+.header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px}
+h1{margin:0;font-size:28px}.subtitle{margin:6px 0 0;color:#94a3b8;font-size:14px}
+.badge{padding:7px 11px;border-radius:999px;background:#052e16;color:#86efac;font-size:12px;font-weight:700}
+.grid{display:grid;grid-template-columns:1fr 1fr 1.5fr;gap:14px}
+.field label{display:block;font-size:13px;font-weight:700;margin-bottom:8px;color:#cbd5e1}
+input,textarea{width:100%;border:1px solid #334155;border-radius:13px;background:#020617;color:#f8fafc;outline:none;padding:13px 14px;font:14px Consolas,monospace}
+input{height:48px}textarea{min-height:150px;resize:vertical}
+input:focus,textarea:focus{border-color:#818cf8;box-shadow:0 0 0 3px rgba(99,102,241,.14)}
+.cookie{min-height:150px}
+.controls{display:flex;flex-wrap:wrap;gap:9px;margin-top:18px}
+button{border:0;border-radius:12px;padding:11px 17px;background:#4f46e5;color:#fff;font-weight:700;cursor:pointer}
+button:hover{filter:brightness(1.1);transform:translateY(-1px)}
+.secondary{background:#334155}.danger{background:#7f1d1d}
+.section-title{display:flex;justify-content:space-between;align-items:center;margin:28px 0 9px}
+.section-title h2{font-size:15px;margin:0}.section-title span{font-size:12px;color:#64748b}
+.output{width:100%;min-height:180px;padding:15px;border:1px solid #334155;border-radius:14px;background:#020617;color:#dbeafe;font:13px/1.55 Consolas,monospace;white-space:pre-wrap;word-break:break-all}
+.status{height:20px;margin-top:10px;color:#a5b4fc;font-size:13px}
+.note{margin-top:12px;color:#64748b;font-size:12px}
+@media(max-width:760px){body{padding:14px}.card{padding:18px}.grid{grid-template-columns:1fr}.cookie{min-height:110px}.header{align-items:flex-start;gap:10px;flex-direction:column}}
+</style>
+</head>
+<body>
+<div class="container">
+<div class="card">
+  <div class="header">
+    <div>
+      <h1>One-Line Formatter</h1>
+      <p class="subtitle">Username + Saved Password + Cookies → Google Sheets</p>
+    </div>
+    <div class="badge">Local + Sheets</div>
+  </div>
+
+  <div class="grid">
+    <div class="field">
+      <label>Username</label>
+      <input id="username" type="text" placeholder="Enter username">
+    </div>
+
+    <div class="field">
+      <label>Saved Password</label>
+      <input id="password" type="password" placeholder="Enter password">
+    </div>
+
+    <div class="field">
+      <label>Cookies</label>
+      <textarea id="cookies" class="cookie" placeholder="Paste cookies here"></textarea>
+    </div>
+  </div>
+
+  <div class="field" style="margin-top:14px">
+    <label>Google Script URL</label>
+    <input id="scriptUrl" type="text" placeholder="https://script.google.com/macros/s/...... /exec">
+  </div>
+
+  <div class="controls">
+    <button id="generate">Generate One-Line</button>
+    <button class="secondary" id="save">Save Password</button>
+    <button class="secondary" id="saveUrl">Save Script URL</button>
+    <button class="secondary" id="toggle">Show / Hide Password</button>
+    <button class="danger" id="clearPass">Clear Saved Password</button>
+  </div>
+
+  <div class="status" id="status"></div>
+
+  <div class="section-title">
+    <h2>One-line Format</h2>
+    <span>Username|Password|Cookies</span>
+  </div>
+
+  <div id="output" class="output"></div>
+
+  <div class="controls">
+    <button id="copy">Copy Output</button>
+    <button class="secondary" id="download">TXT Download</button>
+    <button class="secondary" id="clear">Clear All</button>
+  </div>
+
+  <div class="note">Password ও Script URL শুধু এই ব্রাউজারের local storage-এ সেভ হয়। শিটে পুরো এক লাইন যায়।</div>
+</div>
+</div>
+
+<script>
+const PASS_KEY = "oneLineFormatterPassword";
+const URL_KEY  = "oneLineFormatterScriptUrl";
+
+const $ = id => document.getElementById(id);
+function status(t) { $("status").textContent = t; }
+
+// Safe localStorage helpers
+function safeGet(key) {
+  try { return localStorage.getItem(key); } catch (e) { return null; }
+}
+function safeSet(key, value) {
+  try { localStorage.setItem(key, value); return true; } catch (e) { return false; }
+}
+function safeRemove(key) {
+  try { localStorage.removeItem(key); return true; } catch (e) { return false; }
+}
+
+// Load saved data
+const savedPass = safeGet(PASS_KEY);
+if (savedPass) {
+  $("password").value = savedPass;
+}
+
+const savedUrl = safeGet(URL_KEY);
+if (savedUrl) {
+  $("scriptUrl").value = savedUrl;
+  status("Saved password & Script URL loaded.");
+} else if (savedPass) {
+  status("Saved password loaded.");
+}
+
+$("save").onclick = () => {
+  const p = $("password").value;
+  if (!p) { status("Enter a password first."); return; }
+  if (safeSet(PASS_KEY, p)) {
+    status("Password saved.");
+  } else {
+    status("Cannot save password (storage blocked).");
+  }
+};
+
+$("saveUrl").onclick = () => {
+  const url = $("scriptUrl").value.trim();
+  if (!url) { status("Enter Script URL first."); return; }
+  if (safeSet(URL_KEY, url)) {
+    status("Script URL saved.");
+  } else {
+    status("Cannot save URL (storage blocked).");
+  }
+};
+
+$("clearPass").onclick = () => {
+  safeRemove(PASS_KEY);
+  $("password").value = "";
+  status("Saved password cleared.");
+};
+
+$("toggle").onclick = () => {
+  $("password").type = $("password").type === "password" ? "text" : "password";
+};
+
+$("generate").onclick = async () => {
+  const u = $("username").value.trim();
+  const c = $("cookies").value.trim();
+  const p = $("password").value || safeGet(PASS_KEY) || "";
+  const scriptUrl = $("scriptUrl").value.trim() || safeGet(URL_KEY) || "";
+
+  if (!u || !p || !c) {
+    status("Username, password এবং cookies—সবগুলো পূরণ করুন.");
+    return;
+  }
+
+  if (!scriptUrl) {
+    status("Google Script URL দিন।");
+    return;
+  }
+
+  const oneLine = u + "|" + p + "|" + c;
+  $("output").textContent = oneLine;
+  status("Generating & sending to Google Sheets...");
+
+  try {
+    await fetch(scriptUrl, {
+      method: "POST",
+      mode: "no-cors",
+      redirect: "follow",
+      headers: {
+        "Content-Type": "text/plain;charset=utf-8"
+      },
+      body: JSON.stringify({
+        oneLine: oneLine
+      })
+    });
+    status("One-line generated + Google Sheets-এ পাঠানো হয়েছে ✓");
+  } catch (err) {
+    status("Generated, কিন্তু Sheets-এ পাঠাতে সমস্যা হয়েছে।");
+    console.error(err);
+  }
+};
+
+$("copy").onclick = async () => {
+  const out = $("output").textContent.trim();
+  if (!out) { status("আগে Generate করুন."); return; }
+  try {
+    await navigator.clipboard.writeText(out);
+    status("Output copied.");
+  } catch (e) {
+    status("Copy failed. Output manually copy করুন.");
+  }
+};
+
+$("download").onclick = () => {
+  const out = $("output").textContent.trim();
+  if (!out) { status("আগে Generate করুন."); return; }
+  const blob = new Blob([out + "\n"], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "one-line-format.txt";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  status("TXT file downloaded.");
+};
+
+$("clear").onclick = () => {
+  $("username").value = "";
+  $("cookies").value = "";
+  $("output").textContent = "";
+  status("");
+};
+</script>
+</body>
+</html>
